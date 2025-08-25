@@ -1,0 +1,16 @@
+services:
+  smarttag-frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend/dist:/dist-out
+    command: sh -c "cp -r /dist/* /dist-out/"
+    networks: [appnet]
+
+  smarttag-backend:
+    build: ./backend
+    expose: ["5000"]   # uvicorn ascultă pe 5000
+    networks: [appnet]
+
+networks:
+  appnet:
+    external: true

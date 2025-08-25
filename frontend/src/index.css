@@ -1,0 +1,11 @@
+@import "tailwindcss" ;
+
+:root{ 
+    --card: #F7F9F6 ;
+    --border: #E1E6E0 ; 
+    --accent: #4B7353 ; 
+    --hover: #537E54 ;
+    --text: #1F2937 ;
+    --muted: #6B7280 ;
+    --error: #EF4444 ;
+}
