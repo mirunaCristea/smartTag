@@ -15,7 +15,7 @@ const links = [
   { to: "/dashboard", label: "Dashboard", icon: Home },
   { to: "/studenti",  label: "Studenți",  icon: Users },
   { to: "/prezente",  label: "Prezențe",  icon: FileText },
-  { to: "/Statistici",   label: "Statistici",   icon: BarChart3 },
+  { to: "/statistici",   label: "Statistici",   icon: BarChart3 },
   { to: "/setari",    label: "Setări",    icon: Settings },
 ];
 
