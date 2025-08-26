@@ -28,7 +28,7 @@ export default function Sidebar_component({
   return (
     <aside
       className={[
-        "h-screen flex- shrink-0 border-r border-[#E1E6E0] bg-[#F7F9F6]",
+        "h-screen w-64 shrink-0 border-r border-[#E1E6E0] bg-[#F7F9F6]",
         className,
       ].join(" ")}
     >
