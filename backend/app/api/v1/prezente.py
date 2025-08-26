@@ -35,7 +35,7 @@ def lista_prezente():
 @router.post("/",response_model=Prezenta, status_code=status.HTTP_201_CREATED,summary="Adauga o prezenta noua", tags=["prezente"])
 async def adauga_prezenta(data: PrezentaCreate):
     new_id=len(PREZENTE)+1
-    prezenta=Prezenta(id=new_id, timestamp=datetime.now(), **data.dict())
+    prezenta=Prezenta(id=new_id, timestamp=datetime.now(), **data.model_dump())
     PREZENTE.append(prezenta)
 
     payload = jsonable_encoder(prezenta)
