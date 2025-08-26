@@ -259,11 +259,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white text-gray-900">
+    <div className="flex h-screen bg-white text-gray-900">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto ">
         <div className="min-h-dvh">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+          <div className="mx-auto max-w-7xl px-8 py-8 sm:py-8">
             {/* Header */}
             <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
               <div>
