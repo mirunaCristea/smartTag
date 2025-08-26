@@ -142,7 +142,7 @@ export default function PrezenteLive(){
   function escapeHtml(s){return String(s??"").replace(/[&<>\"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]))}
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex h-screen bg-white">
       <Sidebar />
 
       <main className="flex-1 w-full px-8 py-6 space-y-6">

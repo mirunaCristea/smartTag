@@ -1,11 +1,46 @@
-@import "tailwindcss" ;
+@import "tailwindcss";
 
-:root{ 
-    --card: #F7F9F6 ;
-    --border: #E1E6E0 ; 
-    --accent: #4B7353 ; 
-    --hover: #537E54 ;
-    --text: #1F2937 ;
-    --muted: #6B7280 ;
-    --error: #EF4444 ;
+:root {
+    --card: #F7F9F6;
+    --border: #E1E6E0;
+    --accent: #4B7353;
+    --hover: #537E54;
+    --text: #1F2937;
+    --muted: #6B7280;
+    --error: #EF4444;
 }
+
+.admin-card {
+    @apply rounded-2xl border shadow-sm p-4 transition-shadow;
+    border-color: var(--border);
+    background: var(--card);
+}
+
+.admin-btn {
+    @apply inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition-colors;
+    border: 0.5px solid var(--border);
+    color: var(--text);
+    background: var(--card);
+}
+
+.admin-btn:hover {
+    background: var(--hover);
+    color: white
+}
+
+.admin-input {
+    @apply w-full rounded-xl px-3 py-2 text-sm outline-none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    background: white;
+}
+
+.admin-label {
+    @apply text-sm text-gray-600;
+}
+
+.admin-section-title {
+    @apply text-base font-semibold;
+    color: var(--text);
+}
+

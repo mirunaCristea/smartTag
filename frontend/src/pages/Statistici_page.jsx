@@ -85,9 +85,9 @@ export default function Statistici(){
   const attData = useMemo(()=> (att.data||[]).map(d=>({ ...d, pct: Math.round((d.rate||0)*100) })), [att.data]);
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex h-screen bg-white">
       <Sidebar />
-      <main className="flex-1 w-full px-8 py-6 space-y-6">
+      <main className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
