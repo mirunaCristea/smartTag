@@ -65,7 +65,7 @@ def actualizare_student(id: int, data: StudentUpdate):
                             detail="Student inexistent"
                             )
     current=STUDENTS[idx]
-    update_data=data.dict(exclude_unset=True)
+    update_data=data.model_dump(exclude_unset=True)
     updated=current.copy(update=update_data)
     STUDENTS[idx]=updated
     return updated
