@@ -11,5 +11,6 @@ class PrezentaOut(BaseModel):
     id: int
     student_id: int | None
     timestamp: datetime | None = None
+    uid_hash: str
     status: str
     class Config: from_attributes = True

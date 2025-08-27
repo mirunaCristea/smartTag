@@ -48,10 +48,11 @@ async def create_prezenta(
     ev = await run_in_threadpool(_save)
 
     # WS push (frontend ascultă "prezenta_new")
-    await sio.emit("prezenta_new", {
+    await sio.emit("prezenta_noua", {
         "id": ev.id,
         "student_id": ev.student_id,
-        "timestamps": ev.timestamp.isoformat(),
+        "timestamp": ev.timestamp.isoformat(),
+        "uid_hash": ev.uid_hash,
         "status": ev.status,
     })
 

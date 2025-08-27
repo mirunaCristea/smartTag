@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar_component";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
+import { socket } from "../lib/socket";
+import { api } from "../lib/api";
 
 function cn(...xs) {
   return xs.filter(Boolean).join(" ");
@@ -83,7 +86,7 @@ function LiveFeed({ rows, onClear }) {
           <thead className="sticky top-0 bg-[#F4F7F5] border-b border-[#E1E6E0]">
             <tr className="text-left text-gray-600">
               <th className="px-4 py-2">Time</th>
-              <th className="px-4 py-2">Name</th>
+              <th className="px-4 py-2">Nume</th>
               <th className="px-4 py-2">UID (hash)</th>
               <th className="px-4 py-2">Status</th>
             </tr>
@@ -99,7 +102,7 @@ function LiveFeed({ rows, onClear }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-[#E1E6E0] hover:bg-[#537E54] hover:text-white">
                 <td className="px-4 py-2 tabular-nums text-gray-700">{r.time}</td>
-                <td className="px-4 py-2 text-gray-800">{r.name}</td>
+                <td className="px-4 py-2 text-gray-800">{r.nume}</td>
                 <td className="px-4 py-2 font-mono text-xs text-gray-800">{r.uid}</td>
                 <td className="px-4 py-2">
                   <span
@@ -197,47 +200,131 @@ function QuickActions({ onStartSession, onExportCsv, onRefresh }) {
 
 /* === PAGE === */
 export default function Dashboard() {
-  const [presentToday, setPresentToday] = useState(23);
-  const [absentToday, setAbsentToday] = useState(7);
-  const [activeSessions, setActiveSessions] = useState(1);
-  const [devicesOnline, setDevicesOnline] = useState(2);
-  const [apiStatus, setApiStatus] = useState("online");
-  const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString());
-  const [apiUrl] = useState("http://127.0.0.1:5000");
+  // ====== STATE dinamic legat de backend ======
+  const [events, setEvents] = useState([]);      // evenimente brute din backend
+  const [unknown, setUnknown] = useState([]);    // coadă unknown (dacă vrei să o arăți undeva)
+  const [connected, setConnected] = useState(socket.connected);
+  const [connErr, setConnErr] = useState(null);
 
-  const [feed, setFeed] = useState([
-    { time: "10:02", name: "Popescu Ana", uid: "b4c…89f1", status: "OK" },
-    { time: "10:05", name: "Ionescu Dan", uid: "2ad…a112", status: "NOK" },
-  ]);
+  // KPI-uri (initializează la 0)
+  const [presentToday, setPresentToday] = useState(0);
+  const [absentToday, setAbsentToday] = useState(0);     // dacă nu calculezi absenții, poți lăsa 0
+  const [activeSessions, setActiveSessions] = useState(0); // (opțional) dacă introduci sesiuni
+  const [devicesOnline, setDevicesOnline] = useState(1);
+  const [apiStatus, setApiStatus] = useState("offline");
+  const [lastSync, setLastSync] = useState("—");
+  const [apiUrl] = useState(window.location.origin);
 
-  const activity = useMemo(
-    () => [
-      { time: "09:55", text: "Sesiune laborator – SPA pornită" },
-      { time: "10:05", text: "Scan respins (UID necunoscut)" },
-    ],
-    []
-  );
 
-  const wsTimer = useRef(null);
+  // ====== HELPERS ======
+  const normalize = (ev) => ({
+    id: ev.id,
+    timestamp: ev.timestamp ?? ev.ts,     // backend poate trimite oricare
+    student_id: ev.student_id ?? null,
+    uid_hash: ev.uid_hash ?? ev.uid ?? "",
+    status: ev.status,
+
+  });
+
+  const toFeedRow = (e, nume = "-") => {
+    const d = new Date(e.timestamp);
+    const hh = d.getHours().toString().padStart(2, "0");
+    const mm = d.getMinutes().toString().padStart(2, "0");
+    return {
+      time: `${hh}:${mm}`,
+      nume,
+      uid: e.uid_hash || "—",
+      status: e.status === "accepted" ? "OK" : "NOK",
+    };
+  };
+
+  // KPI calc din events (astăzi)
+  const computeKpis = (list) => {
+    const now = new Date();
+    const isToday = (ts) => {
+      const d = new Date(ts);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    };
+    let total = 0, acc = 0, unk = 0, dup = 0;
+    for (const e of list) {
+      if (!e.timestamp || !isToday(e.timestamp)) continue;
+      total++;
+      if (e.status === "accepted") acc++;
+      else if (e.status === "unknown_card") unk++;
+      else if (e.status === "duplicate") dup++;
+    }
+    return { total, acc, unk, dup };
+  };
+
+  // ====== FETCH inițial ======
+
+useEffect(() => {
+  (async () => {
+    try {
+      const list = await api.prezente(50);         // GET /api/v1/prezente
+      const norm = list.map(normalize);
+      setEvents(norm);
+
+      // KPI “Prezenți azi” din date reale:
+      const today = new Date();
+      const isToday = (ts) => {
+        const d = new Date(ts);
+        return d.getFullYear()===today.getFullYear() &&
+               d.getMonth()===today.getMonth() &&
+               d.getDate()===today.getDate();
+      };
+      const acceptedToday = norm.filter(e => e.status==="accepted" && isToday(e.timestamp)).length;
+      setPresentToday(acceptedToday);
+      setLastSync(new Date().toLocaleTimeString());
+      setApiStatus("online");
+    } catch (e) {
+      console.warn("API error:", e);
+      setApiStatus("offline");
+    }
+  })();
+}, []);
+
+
+  // ====== SOCKET live ======
   useEffect(() => {
-    wsTimer.current = setInterval(() => {
-      const now = new Date();
-      const hh = now.getHours().toString().padStart(2, "0");
-      const mm = now.getMinutes().toString().padStart(2, "0");
-      setFeed((prev) => [
-        {
-          time: `${hh}:${mm}`,
-          name: "Student demo",
-          uid: Math.random().toString(16).slice(2, 6) + "…" + Math.random().toString(16).slice(2, 6),
-          status: Math.random() > 0.85 ? "NOK" : "OK",
-        },
-        ...prev,
-      ].slice(0, 25));
-      setPresentToday((x) => x + 1);
-      setLastSync(now.toLocaleTimeString());
-    }, 8000);
-    return () => clearInterval(wsTimer.current);
+    const onConnect = () => { setConnected(true); setConnErr(null); console.log("connected:", socket.id); };
+    const onDisconnect = () => { setConnected(false); console.log("disconnected:", socket.id); };
+    const onError = (err) => { setConnErr(err?.message ?? String(err)); console.error("socket error:", err); };
+
+    const onNew = (raw) => {
+      const ev = normalize(raw);
+      setEvents((xs) => {
+        const next = [ev, ...xs].slice(0, 50);
+        // update KPI live
+        if (ev.status === "accepted") setPresentToday((x) => x + 1);
+        setLastSync(new Date().toLocaleTimeString());
+
+        const k = computeKpis(next);
+        setPresentToday(k.acc);
+        setLastSync(new Date().toLocaleTimeString());
+        if (ev.status === "unknown_card") {
+          setUnknown((us) => [ev, ...us].slice(0, 10));
+        }
+        return next;
+      });
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onError);
+    socket.on("prezenta_noua", onNew);
+
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onError);
+      socket.off("prezenta_noua", onNew);
+    };
   }, []);
+
+ // ====== LiveFeed rows din events (fără nume student încă) ======
+  const feed = useMemo(() => events.map((e) => toFeedRow(e)), [events]);
 
   const chart = useMemo(
     () => ({
@@ -247,15 +334,28 @@ export default function Dashboard() {
     []
   );
 
+  const activity = useMemo( () => [ { time: "09:55", text: "Sesiune laborator – SPA pornită" }, { time: "10:05", text: "Scan respins (UID necunoscut)" }, ], [] );
+
+// ==== actiuni =====
+
   function handleStartSession() {
     setActiveSessions(1);
   }
   function handleExportCsv() {
-    alert("Export CSV – conectează la backend");
+    api.exportPrezenteCsv(events);
   }
-  function handleRefresh() {
-    setApiStatus("online");
-    setLastSync(new Date().toLocaleTimeString());
+   async function handleRefresh() {
+    try {
+      const list = await api.prezente(50);
+      const norm = list.map(normalize);
+      setEvents(norm);
+      const k = computeKpis(norm);
+      setPresentToday(k.acc);
+      setApiStatus("online");
+      setLastSync(new Date().toLocaleTimeString());
+    } catch {
+      setApiStatus("offline");
+    }
   }
 
   return (
