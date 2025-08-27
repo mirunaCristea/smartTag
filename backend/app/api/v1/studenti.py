@@ -1,94 +1,84 @@
-from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, status
-from typing import List
+# app/api/v1/studenti.py
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_, func
 
-class Student(BaseModel):
-    id: int
-    name: str 
-    uid_hash: str | None = None
-    group: str | None = None
-    is_active: bool = True
+from app.core.db import get_db
+from app.models.student import Student
+from app.schemas.student import StudentCreate, StudentOut
 
+# dacă n-ai încă, îți propun și asta în schemas:
+# class StudentUpdate(BaseModel):
+#     nume: str | None = None
+#     email: EmailStr | None = None
+#     uid_rfid_hash: str | None = None
 
-class StudentCreate(BaseModel):
-    name: str
-    uid_hash: str | None = None
-    group: str | None = None
-    is_active: bool = True
+from app.schemas.student import StudentCreate, StudentOut, StudentUpdate  # + StudentUpdate dacă îl adaugi
 
-class StudentUpdate(BaseModel):
-    name: str | None = None
-    uid_hash: str | None = None
-    group: str | None = None
-    is_active: bool | None = None
+router = APIRouter()
 
+@router.get("", response_model=list[StudentOut])
+def list_students(
+    q: str | None = Query(None, description="search by name/email/uid"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Student)
+    if q:
+        like = f"%{q.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Student.nume).like(like),
+                func.lower(Student.email).like(like),
+                func.lower(Student.uid_hash).like(like),
+            )
+        )
+    return query.order_by(Student.id.desc()).limit(limit).offset(offset).all()
 
+@router.post("", response_model=StudentOut, status_code=status.HTTP_201_CREATED)
+def create_student(body: StudentCreate, db: Session = Depends(get_db)):
+    s = Student(**body.model_dump())
+    db.add(s)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # probabil coliziune pe email sau uid_rfid_hash (ambele ar trebui să fie unique)
+        raise HTTPException(status_code=409, detail="Student with same email or uid_rfid_hash already exists.")
+    db.refresh(s)
+    return s
 
+@router.get("/{student_id}", response_model=StudentOut)
+def get_student(student_id: int, db: Session = Depends(get_db)):
+    s = db.get(Student, student_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return s
 
-STUDENTS: list[Student] = []
+# (opțional) adaugă în schemas: StudentUpdate
+# from app.schemas.student import StudentUpdate
+@router.patch("/{student_id}", response_model=StudentOut)
+def update_student(student_id: int, body: StudentUpdate, db: Session = Depends(get_db)):
+    s = db.get(Student, student_id)
+    if not s:
+        raise HTTPException(404, "Student not found")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(s, k, v)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Email or UID already taken.")
+    db.refresh(s)
+    return s
 
-router= APIRouter()
-
-def find_student_index(student_id: int) -> int | None:
-    for i,s in enumerate(STUDENTS):
-        if s.id == student_id:
-            return i
-        
-    return None
-
-@router.get ("/", response_model=List[Student] ,summary="Listeaza toti studentii", tags=["studenti"])
-def lista_studenti():
-    return STUDENTS
-
-@router.post ("/", response_model=Student,status_code=201,summary="Adauga student", tags=["studenti"])
-def adauga_student( data: StudentCreate):
-    new_id=len(STUDENTS)+1
-    student = Student(id=new_id, **data.dict())  # **data.dict() → transformă obiectul Pydantic în dict și îl “desface” ca argumente.
-    STUDENTS.append(student)
-    return student
-
-@router.get ("/{id}",response_model=Student, summary="Detalii student", tags=["studenti"])
-def detalii_student(id: int):
-    idx=find_student_index(id)
-    if idx is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Student inexistent"
-                           )
-    return STUDENTS[idx]
-
-
-@router.patch ("/{id}",response_model=Student, summary="Actualizeaza partial un student", tags=["studenti"])
-def actualizare_student(id: int, data: StudentUpdate):
-    idx = find_student_index(id)
-    if idx is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Student inexistent"
-                            )
-    current=STUDENTS[idx]
-    update_data=data.model_dump(exclude_unset=True)
-    updated=current.copy(update=update_data)
-    STUDENTS[idx]=updated
-    return updated
-
-
-@router.put("/{id}", response_model=Student, summary="Înlocuiește complet un student")
-def inlocuieste_student(id: int, data: StudentCreate):
-    idx = find_student_index(id)
-    if idx is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student inexistent")
-
-    new_obj = Student(id=id, **data.dict())
-    STUDENTS[idx] = new_obj
-    return new_obj
-
-
-
-
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT, summary="Șterge un student")
-def sterge_student(id: int):
-    idx = find_student_index(id)
-    if idx is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student inexistent")
-
-    STUDENTS.pop(idx)
-    return None
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_student(student_id: int, db: Session = Depends(get_db)):
+    s = db.get(Student, student_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Student not found")
+    db.delete(s)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
