@@ -3,5 +3,8 @@ uvicorn[standard]
 gunicorn
 python-socketio[asgi]
 pydantic
-typing
-datetime
+SQLAlchemy
+pydantic-settings
+pydantic[email]
+anyio
+starlette

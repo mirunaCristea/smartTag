@@ -5,6 +5,7 @@ import Prezente from "./pages/Prezente_page";
 import Statistici from "./pages/Statistici_page";
 import Studenti from "./pages/Studenti_page";
 import Setari from "./pages/Setari_page";
+import SocketPage from "./pages/Socket_page";
 
 
 
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/statistici" element={<Statistici />} />
         <Route path="/studenti" element={<Studenti />} />
         <Route path="/setari" element={<Setari />} />
+        <Route path="/socket-test" element={<SocketPage />} />
 
         <Route path="*" element={<h1 className="p-6">404 - Pagina nu există</h1>} />
       </Routes>
